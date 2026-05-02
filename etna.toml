@@ -1,0 +1,38 @@
+name = "MemoTrie"
+description = "Trie-based generic memoization library (conal/MemoTrie). Bug fixes mined from upstream history; modern HEAD is the base, each patch reverse-applies a fix to install the original bug."
+language = "haskell"
+strategies = ["quickcheck", "hedgehog", "falsify", "smallcheck"]
+crate = "MemoTrie"
+base_commit = "dd3f6a2290d00872178ed304be3e061a1a5a8183"
+
+# ---------------------------------------------------------------------------
+# Variant: integer_instance_word_overflow_1d65a86_1
+# ---------------------------------------------------------------------------
+[[tasks]]
+mutations = ["integer_instance_word_overflow_1d65a86_1"]
+
+[tasks.source]
+repo = "https://github.com/conal/MemoTrie"
+commits = ["1d65a863579b91ee7c0d06cf1c2eb1b8ed9a44da"]
+commit_subjects = ["fixed Integer instance"]
+origin = "internal"
+summary = "The bogus Integer instance encoded the trie as `Word :->: a`, mapping every Integer through `fromIntegral :: Integer -> Word`. For negative inputs that conversion wraps modulo 2^64, so `untrie (trie f) n` evaluates `f` at a huge positive Word index instead of `n`. The fix encodes Integer as `(sign, bits abs)` via the helper pair `bitsZ`/`unbitsZ`, which is total over Integer and round-trips through the trie."
+
+[tasks.injection]
+kind = "patch"
+files = ["src/Data/MemoTrie.hs"]
+locations = [{ file = "src/Data/MemoTrie.hs", line = 499, symbol = "instance HasTrie Integer" }]
+patch = "patches/integer_instance_word_overflow_1d65a86_1.patch"
+
+[tasks.bug]
+short_name = "integer_trie_breaks_for_negatives"
+invariant = "For every Integer n, `untrie (trie id) n == n`. Equivalently, the `HasTrie Integer` instance must round-trip every Integer including negatives — `untrie . trie == id`."
+how_triggered = "Reverse-applying the patch swaps the `(Bool,[Bool])`-based Integer trie back to the bogus `Word`-based form. Calling `untrie (trie id) (-1)` then returns `toInteger (maxBound :: Word)` (= 18446744073709551615 on a 64-bit machine) instead of `-1`."
+
+[[tasks.tasks]]
+property = "IntegerTrieRoundTrip"
+witnesses = [
+  { test_fn = "witness_integer_trie_round_trip_case_neg_one",   note = "untrie (trie id) (-1) must equal -1" },
+  { test_fn = "witness_integer_trie_round_trip_case_neg_three", note = "untrie (trie id) (-3) must equal -3" },
+  { test_fn = "witness_integer_trie_round_trip_case_neg_hundred", note = "untrie (trie id) (-100) must equal -100" },
+]

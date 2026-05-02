@@ -13,3 +13,10 @@ tarballs
 # Where do these files come from?  They're not readable.
 # For instance, .#Help.page
 .#*
+
+# ETNA workload artefacts
+dist-newstyle/
+.ghc.environment.*
+.hegel/
+progress.jsonl
+etna.log
