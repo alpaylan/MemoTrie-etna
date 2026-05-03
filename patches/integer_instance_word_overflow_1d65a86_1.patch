@@ -1,45 +1,19 @@
-From etna-haskell-pipeline Mon Sep 17 00:00:00 2001
-Subject: [PATCH] integer_instance_word_overflow_1d65a86_1
-
-Synthetic patch reflecting upstream commit 1d65a86 ("fixed Integer
-instance"). Reverse-applies (`git apply -R`) to install the original
-bug; forward-applies to restore the fix on the base tree.
-
-Bug summary: the buggy Integer instance maps Integer through Word via
-`fromIntegral`. For negative Integers, `fromIntegral :: Integer -> Word`
-performs modular wrap-around (e.g. `fromIntegral (-1 :: Integer) :: Word`
-== `maxBound :: Word`), so all negative inputs collapse onto large
-positive Word indices. The trie itself stores
-`f . fromIntegral . toInteger`, which then applies `f` to that very
-large positive integer rather than to the original negative input. The
-end result: `untrie (trie f) n /= f n` for every negative n.
-
-The fixed (current HEAD) instance encodes the value as `(sign, bits abs)`
-via `bitsZ`/`unbitsZ`, which is total over Integer.
-
-The unused helpers `unbitsZ`/`bitsZ` are intentionally left in place
-when the bug is installed to keep the diff minimal; they trip an
-unused-binding warning under -Wall but neither the upstream library nor
-the runner uses -Werror.
----
- src/Data/MemoTrie.hs | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
 diff --git a/src/Data/MemoTrie.hs b/src/Data/MemoTrie.hs
+index da2c3e2..d5cd118 100644
 --- a/src/Data/MemoTrie.hs
 +++ b/src/Data/MemoTrie.hs
-@@ -496,10 +496,10 @@ IntInstance(Int64,Word64,Int64Trie)
+@@ -497,10 +497,10 @@ IntInstance(Int64,Word64,Int64Trie)
  -- extract the sign bit.
-
+ 
  instance HasTrie Integer where
--  newtype Integer :->: a = IntegerTrie (Word :->: a)
--  trie f = IntegerTrie (trie (f . fromIntegral . toInteger))
--  untrie (IntegerTrie t) n = untrie t (fromIntegral n)
--  enumerate (IntegerTrie t) = enum' fromIntegral t
-+  newtype Integer :->: a = IntegerTrie ((Bool,[Bool]) :->: a)
-+  trie f = IntegerTrie (trie (f . unbitsZ))
-+  untrie (IntegerTrie t) = untrie t . bitsZ
-+  enumerate (IntegerTrie t) = enum' unbitsZ t
-
-
+-  newtype Integer :->: a = IntegerTrie ((Bool,[Bool]) :->: a)
+-  trie f = IntegerTrie (trie (f . unbitsZ))
+-  untrie (IntegerTrie t) = untrie t . bitsZ
+-  enumerate (IntegerTrie t) = enum' unbitsZ t
++  newtype Integer :->: a = IntegerTrie (Word :->: a)
++  trie f = IntegerTrie (trie (f . fromIntegral . toInteger))
++  untrie (IntegerTrie t) n = untrie t (fromIntegral n)
++  enumerate (IntegerTrie t) = enum' fromIntegral t
+ 
+ 
  unbitsZ :: (Num n, Bits n) => (Bool,[Bool]) -> n
